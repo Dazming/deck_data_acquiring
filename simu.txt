@@ -1,0 +1,41 @@
+The model parameters are as follows, take a ship part of the deck as 
+an example, the plate frame structure length L =40 m, width B =8 m. 
+deck thickness D =25 mm. deck under the T profile and longitudinal 
+reinforcement. Define the material density of the plate frame as 7850 
+kg/m3, the modulus of elasticity as E =2.06 ×1011 N/m2, Poisson’s 
+ratio as 0.3, and the finite element mesh is divided into 14,240 cells with 
+the cell type selected as shell181. The finite element model of the deck 
+and its constraint situation with the vehicle moving route are shown in 
+Fig. 8:
+To better simulate the deck conditions, rigid fixed constraints are 
+used around the plate frame. To facilitate the subsequent selection of 
+response node coordinates and loading of the load, the plate frame 
+model was shifted until the coordinates of the starting position of the 
+shifted load were (0, 0, 0). The traveling route is shown as the red line 
+segment in Fig. 8(d), the arrow is the end position, and there are 200 
+units and 201 nodes on the traveling road. In this case, double time- 
+varying load are used to simulate the axle weights of the front and 
+rear vehicles, where the ratio of the front and rear axle weights is taken 
+to be 1:1, and the axle spacing between the front and rear vehicles is 8 m.
+The location of the measurement points is selected as shown in Fig. 9, 
+the longitudinal interval of each measurement point being 1/8 of the 
+deck length, and the transverse with the deck edge being 2 m. The co
+ordinates of the measurement points are N1 (5, 2, 0), N2 (10, -2, 0), N3 
+(15, 2, 0), N4 (20, -2, 0), N5 (25, 2, 0), N6 (30, -2, 0), and N7 (35, 2, 0).
+The deck damping is defined using Rayleigh damping, where the 
+coefficients α, and β are calculated as follows: 
+α=2ω1ω2ξ/(ω1+ω2)
+β= 2ξ/(ω1+ω2)
+where ξ denotes the damping coefficient of steel, between 0.003 and 0.005, in this paper we take 0.005; ω1 denotes the first natural frequency 
+of this plate structure; ω2 denotes the second natural frequency of the 
+plate structure; ω1 and ω2 are calculated by ANSYS modal analysis.
+The computational methodology uses the transient dynamics module 
+in ANSYS to bring the time-varying load into the finite element model 
+for the solution. The displacement and acceleration responses under 
+seven measurement points were extracted for each condition and input 
+into the AMF-BiGRU model for multi-modal fusion, and the output 
+features were the front and rear axle weights and front and rear wheel 
+positions. For the moving load reconstruction and localization results, 
+the results when the front and rear wheels are not on and off the deck are 
+0. For the localization results, when the vehicle is on the deck, the output 
+is the distance of the load from the left end of the deck.

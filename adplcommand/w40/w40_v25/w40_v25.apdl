@@ -1,0 +1,411 @@
+! Simplified deck moving-load simulation in ANSYS APDL.
+! Units: m, kg, N, s.
+! Model: 40 m x 8 m x 25 mm SHELL181 deck with simplified underside
+! T profiles and longitudinal reinforcements, fixed on all edges.
+! Analysis: modal analysis for Rayleigh damping, then full transient.
+! Output setup: POST26 variables for vertical displacement and acceleration
+! at measurement points N1 to N7. No result export commands are issued.
+
+/CLEAR,START
+/FILNAME,w40_v25,1
+/TITLE,Deck Moving Double-Axle Load w40_v25
+
+! ----------------------------------------------------------------------
+! Parameters
+! ----------------------------------------------------------------------
+L_DECK=40
+B_DECK=8
+HALF_B=B_DECK/2
+THK_DECK=0.025
+
+E_MOD=2.06E11
+NU_MAT=0.3
+RHO_MAT=7850
+
+NX=200
+NY=40
+DX=L_DECK/NX
+DY=B_DECK/NY
+NROW=NY+1
+
+VEL=25
+DT=0.001
+AXLE_SPACE=8
+F_FRONT=40000
+F_REAR=40000
+T_END=(L_DECK+AXLE_SPACE)/VEL
+N_STEPS=1920
+DAMP_RATIO=0.005
+
+! Empirical stiffener dimensions inferred from Fig. 8 style.
+! Transverse T profiles: full-width T members below deck.
+! With the current deck mesh this gives 17 frames from x=4 m to x=36 m,
+! spaced by 2 m, and a total of 14240 shell elements.
+TR_FRAME_START=20
+TR_FRAME_END=180
+TR_FRAME_STEP=10
+TR_WEB_H=0.45
+TR_WEB_T=0.012
+TR_FLG_W=0.18
+TR_FLG_T=0.016
+TR_FLG_HALF=TR_FLG_W/2
+
+! Longitudinal reinforcements: T members along deck length.
+! J indices 5,10,...,35 correspond to y=-3,-2,...,+3 m.
+LONG_J_START=5
+LONG_J_END=35
+LONG_J_STEP=5
+LONG_WEB_H=0.25
+LONG_WEB_T=0.010
+LONG_FLG_W=0.12
+LONG_FLG_T=0.012
+LONG_FLG_HALF=LONG_FLG_W/2
+
+! Grid indices for y = 0, y = -2 m, and y = +2 m.
+! These values match NY = 40 and DY = 0.2 m on y = -4..+4 m.
+J_Y0=20
+J_YM2=10
+J_YP2=30
+
+! Measurement node IDs. Node numbering is:
+! node_id = i_x * (NY + 1) + j_y + 1
+! N7 is set to y = +2 to match Fig. 9 and the alternating layout.
+! If you need the literal text value N7=(35,-2,0), change J_YP2 to J_YM2.
+N_N1=25*NROW+J_YP2+1
+N_N2=50*NROW+J_YM2+1
+N_N3=75*NROW+J_YP2+1
+N_N4=100*NROW+J_YM2+1
+N_N5=125*NROW+J_YP2+1
+N_N6=150*NROW+J_YM2+1
+N_N7=175*NROW+J_YP2+1
+
+PI_VAL=ACOS(-1)
+
+! ----------------------------------------------------------------------
+! Pre-processing: material, section, mesh, constraints
+! ----------------------------------------------------------------------
+/PREP7
+
+ET,1,SHELL181
+KEYOPT,1,3,2
+
+MP,EX,1,E_MOD
+MP,PRXY,1,NU_MAT
+MP,DENS,1,RHO_MAT
+
+SECTYPE,1,SHELL
+SECOFFSET,MID
+SECDATA,THK_DECK,1,0,5
+
+SECTYPE,2,SHELL
+SECOFFSET,MID
+SECDATA,TR_WEB_T,1,0,5
+
+SECTYPE,3,SHELL
+SECOFFSET,MID
+SECDATA,TR_FLG_T,1,0,5
+
+SECTYPE,4,SHELL
+SECOFFSET,MID
+SECDATA,LONG_WEB_T,1,0,5
+
+SECTYPE,5,SHELL
+SECOFFSET,MID
+SECDATA,LONG_FLG_T,1,0,5
+
+! Create regular deck nodes.
+*DO,I_X,0,NX
+  X_CUR=I_X*DX
+  *DO,J_Y,0,NY
+    Y_CUR=-HALF_B+J_Y*DY
+    NODE_ID=I_X*NROW+J_Y+1
+    N,NODE_ID,X_CUR,Y_CUR,0
+  *ENDDO
+*ENDDO
+
+! Create quadrilateral shell elements.
+TYPE,1
+MAT,1
+SECNUM,1
+*DO,I_X,0,NX-1
+  *DO,J_Y,0,NY-1
+    NODE_A=I_X*NROW+J_Y+1
+    NODE_B=(I_X+1)*NROW+J_Y+1
+    NODE_C=(I_X+1)*NROW+(J_Y+1)+1
+    NODE_D=I_X*NROW+(J_Y+1)+1
+    E,NODE_A,NODE_B,NODE_C,NODE_D
+  *ENDDO
+*ENDDO
+
+! ----------------------------------------------------------------------
+! Simplified underside T profiles and longitudinal reinforcements.
+! The top edge of each web shares deck nodes, so the stiffeners are tied
+! to the plate without contact or constraint equations.
+! ----------------------------------------------------------------------
+NEXT_NODE=(NX+1)*NROW+1
+TYPE,1
+MAT,1
+
+! Longitudinal T reinforcements along x direction.
+*DO,J_STIF,LONG_J_START,LONG_J_END,LONG_J_STEP
+  Y_STIF=-HALF_B+J_STIF*DY
+
+  LONG_C0=NEXT_NODE
+  *DO,I_X,0,NX
+    X_CUR=I_X*DX
+    N,NEXT_NODE,X_CUR,Y_STIF,-LONG_WEB_H
+    NEXT_NODE=NEXT_NODE+1
+  *ENDDO
+
+  LONG_L0=NEXT_NODE
+  *DO,I_X,0,NX
+    X_CUR=I_X*DX
+    N,NEXT_NODE,X_CUR,Y_STIF-LONG_FLG_HALF,-LONG_WEB_H
+    NEXT_NODE=NEXT_NODE+1
+  *ENDDO
+
+  LONG_R0=NEXT_NODE
+  *DO,I_X,0,NX
+    X_CUR=I_X*DX
+    N,NEXT_NODE,X_CUR,Y_STIF+LONG_FLG_HALF,-LONG_WEB_H
+    NEXT_NODE=NEXT_NODE+1
+  *ENDDO
+
+  SECNUM,4
+  *DO,I_X,0,NX-1
+    TOP_A=I_X*NROW+J_STIF+1
+    TOP_B=(I_X+1)*NROW+J_STIF+1
+    BOT_A=LONG_C0+I_X
+    BOT_B=LONG_C0+I_X+1
+    E,TOP_A,TOP_B,BOT_B,BOT_A
+  *ENDDO
+
+  SECNUM,5
+  *DO,I_X,0,NX-1
+    C_A=LONG_C0+I_X
+    C_B=LONG_C0+I_X+1
+    L_A=LONG_L0+I_X
+    L_B=LONG_L0+I_X+1
+    R_A=LONG_R0+I_X
+    R_B=LONG_R0+I_X+1
+    E,L_A,L_B,C_B,C_A
+    E,C_A,C_B,R_B,R_A
+  *ENDDO
+*ENDDO
+
+! Transverse T profiles across y direction.
+*DO,I_FRAME,TR_FRAME_START,TR_FRAME_END,TR_FRAME_STEP
+  X_FRAME=I_FRAME*DX
+
+  TR_C0=NEXT_NODE
+  *DO,J_Y,0,NY
+    Y_CUR=-HALF_B+J_Y*DY
+    N,NEXT_NODE,X_FRAME,Y_CUR,-TR_WEB_H
+    NEXT_NODE=NEXT_NODE+1
+  *ENDDO
+
+  TR_L0=NEXT_NODE
+  *DO,J_Y,0,NY
+    Y_CUR=-HALF_B+J_Y*DY
+    N,NEXT_NODE,X_FRAME-TR_FLG_HALF,Y_CUR,-TR_WEB_H
+    NEXT_NODE=NEXT_NODE+1
+  *ENDDO
+
+  TR_R0=NEXT_NODE
+  *DO,J_Y,0,NY
+    Y_CUR=-HALF_B+J_Y*DY
+    N,NEXT_NODE,X_FRAME+TR_FLG_HALF,Y_CUR,-TR_WEB_H
+    NEXT_NODE=NEXT_NODE+1
+  *ENDDO
+
+  SECNUM,2
+  *DO,J_Y,0,NY-1
+    TOP_A=I_FRAME*NROW+J_Y+1
+    TOP_B=I_FRAME*NROW+(J_Y+1)+1
+    BOT_A=TR_C0+J_Y
+    BOT_B=TR_C0+J_Y+1
+    E,TOP_A,TOP_B,BOT_B,BOT_A
+  *ENDDO
+
+  SECNUM,3
+  *DO,J_Y,0,NY-1
+    C_A=TR_C0+J_Y
+    C_B=TR_C0+J_Y+1
+    L_A=TR_L0+J_Y
+    L_B=TR_L0+J_Y+1
+    R_A=TR_R0+J_Y
+    R_B=TR_R0+J_Y+1
+    E,L_A,L_B,C_B,C_A
+    E,C_A,C_B,R_B,R_A
+  *ENDDO
+*ENDDO
+
+! Fixed supports along all four plate edges.
+NSEL,S,LOC,X,0
+NSEL,A,LOC,X,L_DECK
+NSEL,A,LOC,Y,-HALF_B
+NSEL,A,LOC,Y,HALF_B
+D,ALL,ALL,0
+ALLSEL,ALL
+
+! Store measurement-node components for easy inspection in ANSYS.
+NSEL,S,NODE,,N_N1
+CM,N1_MEAS,NODE
+NSEL,S,NODE,,N_N2
+CM,N2_MEAS,NODE
+NSEL,S,NODE,,N_N3
+CM,N3_MEAS,NODE
+NSEL,S,NODE,,N_N4
+CM,N4_MEAS,NODE
+NSEL,S,NODE,,N_N5
+CM,N5_MEAS,NODE
+NSEL,S,NODE,,N_N6
+CM,N6_MEAS,NODE
+NSEL,S,NODE,,N_N7
+CM,N7_MEAS,NODE
+ALLSEL,ALL
+
+! Coordinate checks are kept as parameters in the output database.
+*GET,N1_X,NODE,N_N1,LOC,X
+*GET,N1_Y,NODE,N_N1,LOC,Y
+*GET,N2_X,NODE,N_N2,LOC,X
+*GET,N2_Y,NODE,N_N2,LOC,Y
+*GET,N3_X,NODE,N_N3,LOC,X
+*GET,N3_Y,NODE,N_N3,LOC,Y
+*GET,N4_X,NODE,N_N4,LOC,X
+*GET,N4_Y,NODE,N_N4,LOC,Y
+*GET,N5_X,NODE,N_N5,LOC,X
+*GET,N5_Y,NODE,N_N5,LOC,Y
+*GET,N6_X,NODE,N_N6,LOC,X
+*GET,N6_Y,NODE,N_N6,LOC,Y
+*GET,N7_X,NODE,N_N7,LOC,X
+*GET,N7_Y,NODE,N_N7,LOC,Y
+
+FINISH
+
+! ----------------------------------------------------------------------
+! Modal analysis: first two natural frequencies
+! ----------------------------------------------------------------------
+/SOLU
+ANTYPE,MODAL
+MODOPT,LANB,2
+MXPAND,2,,,YES
+PSTRES,OFF
+SOLVE
+FINISH
+
+/POST1
+SET,1,1
+*GET,FREQ1,MODE,1,FREQ
+SET,1,2
+*GET,FREQ2,MODE,2,FREQ
+FINISH
+
+OMEGA1=2*PI_VAL*FREQ1
+OMEGA2=2*PI_VAL*FREQ2
+ALPHA_R=2*OMEGA1*OMEGA2*DAMP_RATIO/(OMEGA1+OMEGA2)
+BETA_R=2*DAMP_RATIO/(OMEGA1+OMEGA2)
+
+! ----------------------------------------------------------------------
+! Full transient analysis with a moving double-axle vertical load
+! ----------------------------------------------------------------------
+/SOLU
+ANTYPE,TRANS,NEW
+TRNOPT,FULL
+TIMINT,ON
+NLGEOM,OFF
+AUTOTS,OFF
+DELTIM,DT,DT,DT
+NSUBST,1,1,1
+KBC,0
+OUTRES,ALL,ALL
+ALPHAD,ALPHA_R
+BETAD,BETA_R
+ALLSEL,ALL
+
+*DO,I_STEP,1,N_STEPS
+  T_NOW=I_STEP*DT
+  FDELE,ALL,ALL
+
+  ! Front axle: x = VEL*t, active on 0 <= x <= L_DECK.
+  X_LOAD=VEL*T_NOW
+  LOAD_DONE=0
+  *IF,X_LOAD,GE,0,THEN
+    *IF,X_LOAD,LE,L_DECK,THEN
+      *DO,I_SEG,0,NX-1
+        *IF,LOAD_DONE,EQ,0,THEN
+          X_LEFT=I_SEG*DX
+          X_RIGHT=(I_SEG+1)*DX
+          *IF,X_LOAD,GE,X_LEFT,THEN
+            *IF,X_LOAD,LE,X_RIGHT,THEN
+              W_RIGHT=(X_LOAD-X_LEFT)/DX
+              W_LEFT=1-W_RIGHT
+              NODE_L=I_SEG*NROW+J_Y0+1
+              NODE_R=(I_SEG+1)*NROW+J_Y0+1
+              F,NODE_L,FZ,-F_FRONT*W_LEFT
+              F,NODE_R,FZ,-F_FRONT*W_RIGHT
+              LOAD_DONE=1
+            *ENDIF
+          *ENDIF
+        *ENDIF
+      *ENDDO
+    *ENDIF
+  *ENDIF
+
+  ! Rear axle: x = VEL*t - AXLE_SPACE, active on 0 <= x <= L_DECK.
+  X_LOAD=VEL*T_NOW-AXLE_SPACE
+  LOAD_DONE=0
+  *IF,X_LOAD,GE,0,THEN
+    *IF,X_LOAD,LE,L_DECK,THEN
+      *DO,I_SEG,0,NX-1
+        *IF,LOAD_DONE,EQ,0,THEN
+          X_LEFT=I_SEG*DX
+          X_RIGHT=(I_SEG+1)*DX
+          *IF,X_LOAD,GE,X_LEFT,THEN
+            *IF,X_LOAD,LE,X_RIGHT,THEN
+              W_RIGHT=(X_LOAD-X_LEFT)/DX
+              W_LEFT=1-W_RIGHT
+              NODE_L=I_SEG*NROW+J_Y0+1
+              NODE_R=(I_SEG+1)*NROW+J_Y0+1
+              F,NODE_L,FZ,-F_REAR*W_LEFT
+              F,NODE_R,FZ,-F_REAR*W_RIGHT
+              LOAD_DONE=1
+            *ENDIF
+          *ENDIF
+        *ENDIF
+      *ENDDO
+    *ENDIF
+  *ENDIF
+
+  TIME,T_NOW
+  SOLVE
+*ENDDO
+
+FINISH
+
+! ----------------------------------------------------------------------
+! POST26 response variables: vertical displacement and acceleration
+! ----------------------------------------------------------------------
+/POST26
+RESET
+NUMVAR,200
+FILE,w40_v25,rst
+
+NSOL,2,N_N1,U,Z,N1_UZ
+NSOL,3,N_N1,A,Z,N1_AZ
+NSOL,4,N_N2,U,Z,N2_UZ
+NSOL,5,N_N2,A,Z,N2_AZ
+NSOL,6,N_N3,U,Z,N3_UZ
+NSOL,7,N_N3,A,Z,N3_AZ
+NSOL,8,N_N4,U,Z,N4_UZ
+NSOL,9,N_N4,A,Z,N4_AZ
+NSOL,10,N_N5,U,Z,N5_UZ
+NSOL,11,N_N5,A,Z,N5_AZ
+NSOL,12,N_N6,U,Z,N6_UZ
+NSOL,13,N_N6,A,Z,N6_AZ
+NSOL,14,N_N7,U,Z,N7_UZ
+NSOL,15,N_N7,A,Z,N7_AZ
+
+STORE,NEW
+
+FINISH
