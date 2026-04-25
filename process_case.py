@@ -114,10 +114,10 @@ def merge_split_csv(case_name):
     return output_file
 
 
-def label_wheel_position(x, axle_weight, exit_tol):
+def label_wheel_position(x, axle_weight, exit_tol, allow_exit_clamp=False):
     if 0.0 <= x <= DECK_LENGTH:
         return x, axle_weight
-    if DECK_LENGTH < x <= DECK_LENGTH + exit_tol:
+    if allow_exit_clamp and DECK_LENGTH < x <= DECK_LENGTH + exit_tol:
         return DECK_LENGTH, axle_weight
     return 0.0, 0.0
 
@@ -127,7 +127,12 @@ def compute_labels(t, axle_weight, speed):
     front_x = speed * t
     rear_x = front_x - AXLE_DIST
     front_pos, front_wt = label_wheel_position(front_x, axle_weight, exit_tol)
-    rear_pos, rear_wt = label_wheel_position(rear_x, axle_weight, exit_tol)
+    rear_pos, rear_wt = label_wheel_position(
+        rear_x,
+        axle_weight,
+        exit_tol,
+        allow_exit_clamp=True,
+    )
     return front_pos, rear_pos, front_wt, rear_wt
 
 

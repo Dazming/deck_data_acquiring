@@ -59,10 +59,10 @@ OUTPUT_FILE = LABELED_DIR / f"{CASE_NAME}_labeled.csv"
 EXIT_TOL = SPEED * DT + 1e-9
 
 
-def label_wheel_position(x):
+def label_wheel_position(x, allow_exit_clamp=False):
     if 0.0 <= x <= DECK_LENGTH:
         return x, AXLE_WEIGHT
-    if DECK_LENGTH < x <= DECK_LENGTH + EXIT_TOL:
+    if allow_exit_clamp and DECK_LENGTH < x <= DECK_LENGTH + EXIT_TOL:
         return DECK_LENGTH, AXLE_WEIGHT
     return 0.0, 0.0
 
@@ -76,7 +76,7 @@ def compute_labels(t):
     rear_x  = front_x - AXLE_DIST
 
     front_pos, front_wt = label_wheel_position(front_x)
-    rear_pos, rear_wt = label_wheel_position(rear_x)
+    rear_pos, rear_wt = label_wheel_position(rear_x, allow_exit_clamp=True)
 
     return front_pos, rear_pos, front_wt, rear_wt
 
