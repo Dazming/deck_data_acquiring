@@ -5,7 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 # ============================
-CASE_NAME = "w38_v40"
+CASE_NAME = "w50_v40"
 # ===========================
 
 """
